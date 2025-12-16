@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WebGPU Vertex Scanner</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050510; color: #eee; font-family: 'Segoe UI', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+        
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-end;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #stats-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 20, 40, 0.85);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            color: #0ff;
+            border: 1px solid #0aa;
+            pointer-events: none;
+            min-width: 150px;
+            z-index: 100;
+            box-shadow: 0 0 10px rgba(0,255,255,0.2);
+        }
+
+        .panel {
+            background: rgba(0, 10, 20, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 8px;
+            pointer-events: auto;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            max-width: 350px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin: 0 0 10px 0; font-size: 1.1rem; color: #0ff; text-transform: uppercase; letter-spacing: 2px; }
+        p { margin: 5px 0; font-size: 0.85rem; color: #aaa; line-height: 1.4; }
+        
+        button {
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 8px;
+            width: 100%;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+        button:hover { background: rgba(0, 255, 255, 0.3); }
+        button:active { background: #0ff; color: #000; }
+        
+        .controls { display: flex; gap: 8px; flex-direction: column; }
+        
+        #status {
+            font-size: 0.8rem;
+            color: #0ff;
+            margin-top: 10px;
+            font-weight: bold;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+
+        #zone-joystick {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            width: 150px;
+            height: 150px;
+            z-index: 50;
+            pointer-events: auto;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 600px) {
+            #ui-layer { 
+                padding: 10px;
+                align-items: center;
+                justify-content: flex-start;
+            }
+            .panel { 
+                width: 100%; 
+                max-width: none; 
+                margin-top: 0;
+            }
+            h1 { font-size: 1rem; }
+            #stats-display { font-size: 11px; top: auto; bottom: 20px; left: 20px; width: 120px; }
+            #zone-joystick {
+                bottom: 40px;
+                left: 20px;
+            }
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://esm.sh/three@0.167.0/webgpu",
+                "three/webgpu": "https://esm.sh/three@0.167.0/webgpu",
+                "three/tsl": "https://esm.sh/three@0.167.0/tsl",
+                "three/addons/": "https://esm.sh/three@0.167.0/examples/jsm/",
+                "nipplejs": "https://esm.sh/nipplejs@0.10.1"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="zone-joystick"></div>
+
+    <div id="stats-display">
+        <div><span style="color:#666">FPS:</span> <span id="fps-val">--</span></div>
+        <div><span style="color:#0ff">Tris:</span> <span id="vis-val">--</span></div>
+        <div><span style="color:#444">Total:</span> <span id="total-val">--</span></div>
+    </div>
+
+    <div id="ui-layer">
+        <div class="panel">
+            <h1>City Render Optimization</h1>
+            <p>Real-time geometry culling algorithm.</p>
+            <p style="font-size: 0.8em; color: #666">Move with WASD or Joystick.</p>
+            
+            <div class="controls">
+                <button id="view-mode-btn">View: First Person</button>
+            </div>
+            <div id="status">Current: Player Camera</div>
+        </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
