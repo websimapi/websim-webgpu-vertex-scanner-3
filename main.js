@@ -8,6 +8,7 @@ let renderer, scene;
 let playerCamera, observerCamera; 
 let activeCamera; // The one currently rendering
 let cullingCamera; // The one determining visibility
+let _wideCamera; // Wider FOV camera for culling calculations to prevent pop-in
 let playerMesh, observerControls;
 
 // Game State
@@ -82,7 +83,8 @@ function init() {
     const ambient = new THREE.AmbientLight(0xffffff, 0.2);
     scene.add(ambient);
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    dirLight.position.set(20, 50, 20);
+    dirLight.position.set(50, 100, 50);
+    dirLight.castShadow = true;
     scene.add(dirLight);
     
     // Add some "Cyber" lights
@@ -120,52 +122,128 @@ function init() {
 }
 
 function generateCity() {
-    const buildings = [];
-    const gridSize = 16;
-    const spacing = 12;
+    const geometries = [];
+    const gridSize = 12;     // 12x12 blocks
+    const blockSize = 60;    // 60 meters per block
+    const roadWidth = 14;    // Wide roads
+    const sidewalkWidth = 4; // 4m sidewalks
+    
+    // Helper: Create a box with vertex colors and push to merge list
+    function addBox(w, h, d, x, y, z, colorHex) {
+        const geo = new THREE.BoxGeometry(w, h, d);
+        geo.translate(x, y, z);
+        
+        // Add Vertex Colors
+        const count = geo.attributes.position.count;
+        const colors = new Float32Array(count * 3);
+        const c = new THREE.Color(colorHex);
+        
+        // Slight noise for realism
+        const variation = (Math.random() - 0.5) * 0.05;
+        const r = Math.max(0, Math.min(1, c.r + variation));
+        const g = Math.max(0, Math.min(1, c.g + variation));
+        const b = Math.max(0, Math.min(1, c.b + variation));
 
-    // Ground Plane (Grid)
-    const groundGeo = new THREE.PlaneGeometry(300, 300, 50, 50);
-    groundGeo.rotateX(-Math.PI / 2);
-    const groundMat = new THREE.MeshBasicMaterial({ 
-        color: 0x111122, 
-        wireframe: true,
-        transparent: true,
-        opacity: 0.3
-    });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.position.y = -0.1;
-    scene.add(ground);
+        for(let i=0; i<count; i++) {
+            colors[i*3] = r;
+            colors[i*3+1] = g;
+            colors[i*3+2] = b;
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        
+        // Delete UVs if not used to save memory, or keep if needed. 
+        // BoxGeometry has UVs. We'll keep them for consistency.
+        
+        geometries.push(geo);
+    }
 
-    // Buildings
+    // Generate Grid
     for(let x = -gridSize/2; x < gridSize/2; x++) {
         for(let z = -gridSize/2; z < gridSize/2; z++) {
-            if (Math.random() > 0.8) continue; // Random gaps
-
-            const h = Math.random() * 20 + 5;
-            const w = Math.random() * 4 + 4;
-            const d = Math.random() * 4 + 4;
-
-            const geo = new THREE.BoxGeometry(w, h, d);
-            geo.translate(x * spacing, h/2, z * spacing);
+            const centerX = x * blockSize;
+            const centerZ = z * blockSize;
             
-            // Randomize UVs or Colors could go here
-            buildings.push(geo);
+            // 1. Roads (Asphalt) - Cross shape for intersection
+            // Main road patches
+            addBox(blockSize, 0.2, roadWidth, centerX, 0, centerZ, 0x222222);
+            addBox(roadWidth, 0.2, blockSize, centerX, 0, centerZ, 0x222222);
+            
+            // 2. Sidewalks (Concrete) - The block island
+            const islandSize = blockSize - roadWidth; 
+            // Sidewalk base
+            addBox(islandSize, 0.6, islandSize, centerX, 0.3, centerZ, 0x888888);
+            
+            // 3. Buildings
+            // Determine building footprint
+            const bMaxW = islandSize - (sidewalkWidth * 2);
+            const bMaxD = islandSize - (sidewalkWidth * 2);
+            
+            if (Math.random() > 0.15) { // Most blocks have buildings
+                const buildingColor = new THREE.Color().setHSL(Math.random(), 0.3, 0.2 + Math.random() * 0.4).getHex();
+                
+                // Varied Architecture
+                const type = Math.random();
+                const height = 15 + Math.random() * 60 + (Math.random() > 0.9 ? 80 : 0); // Occasional super-tall
+                
+                let currentY = 0.6; // Start on top of sidewalk
+                
+                if (type < 0.4) {
+                    // "Wedding Cake" style (Stepped)
+                    const tiers = 3;
+                    let w = bMaxW;
+                    let d = bMaxD;
+                    const tierH = height / tiers;
+                    
+                    for(let t=0; t<tiers; t++) {
+                        addBox(w, tierH, d, centerX, currentY + tierH/2, centerZ, buildingColor);
+                        currentY += tierH;
+                        w *= 0.7;
+                        d *= 0.7;
+                    }
+                } else if (type < 0.7) {
+                    // Twin Towers or split
+                    const w = bMaxW * 0.4;
+                    const d = bMaxD * 0.8;
+                    addBox(w, height, d, centerX - w/1.5, currentY + height/2, centerZ, buildingColor);
+                    addBox(w, height * 0.8, d, centerX + w/1.5, currentY + (height*0.8)/2, centerZ, buildingColor);
+                } else {
+                    // Monolith with details
+                    addBox(bMaxW, height, bMaxD, centerX, currentY + height/2, centerZ, buildingColor);
+                    
+                    // Vertical ribs
+                    const ribCount = 4;
+                    const ribW = bMaxW / (ribCount * 2);
+                    for(let r=0; r<ribCount; r++) {
+                        // Ribs on one side
+                        addBox(ribW, height, bMaxD + 1, centerX - bMaxW/2 + r*(ribW*2) + ribW/2, currentY + height/2, centerZ, 0x555555);
+                    }
+                }
+                
+                // Roof junk
+                if (Math.random() > 0.5) {
+                    addBox(2, 6, 2, centerX, currentY + height + 3, centerZ, 0x999999);
+                    addBox(0.5, 12, 0.5, centerX, currentY + height + 6, centerZ, 0xff0000); // Antenna
+                }
+            } else {
+                // Park / Plaza
+                addBox(bMaxW, 0.4, bMaxD, centerX, 0.7, centerZ, 0x225522); // Grass
+                // Fountain?
+                addBox(4, 2, 4, centerX, 1.7, centerZ, 0xaaaaaa);
+            }
         }
     }
 
-    if (buildings.length === 0) return;
+    if (geometries.length === 0) return;
 
     // Merge all buildings into one geometry
-    baseGeometry = BufferGeometryUtils.mergeGeometries(buildings, false);
+    baseGeometry = BufferGeometryUtils.mergeGeometries(geometries, false);
     
     // Create a mesh with this geometry
     const material = new THREE.MeshPhongMaterial({
-        color: 0x00aaff,
-        emissive: 0x001133,
-        shininess: 80,
-        specular: 0x111111,
-        side: THREE.DoubleSide, // Crucial so we can see when backfaces are culled
+        vertexColors: true, // IMPORTANT: Use colors we baked in
+        shininess: 40,
+        specular: 0x222222,
+        side: THREE.DoubleSide, 
         wireframe: false,
         flatShading: true
     });
@@ -199,7 +277,7 @@ function generateCity() {
 
 function updateGameLogic(dt) {
     // Movement logic (apply to Player Position)
-    const speed = 15 * dt;
+    const speed = 10 * dt; // Adjusted for realistic scale (10m/s sprint)
     const rotSpeed = 2 * dt;
 
     let moveFwd = 0;
@@ -259,11 +337,20 @@ function updateCulling() {
     // In Observer mode, we still cull based on PLAYER camera to see the effect
     cullingCamera = playerCamera;
     
-    cullingCamera.updateMatrixWorld();
-    cullingCamera.updateProjectionMatrix();
+    // Setup Wide Camera for Culling to prevent pop-in at edges
+    // We create a virtual camera with a wider Field of View (FOV)
+    if (!_wideCamera) {
+        _wideCamera = new THREE.PerspectiveCamera(cullingCamera.fov + 25, cullingCamera.aspect, cullingCamera.near, cullingCamera.far);
+    }
+    // Sync wide camera with player camera
+    _wideCamera.position.copy(cullingCamera.position);
+    _wideCamera.quaternion.copy(cullingCamera.quaternion);
+    _wideCamera.aspect = cullingCamera.aspect;
+    _wideCamera.updateProjectionMatrix();
+    _wideCamera.updateMatrixWorld();
 
-    // 2. Setup Frustum
-    _projScreenMatrix.multiplyMatrices(cullingCamera.projectionMatrix, cullingCamera.matrixWorldInverse);
+    // 2. Setup Frustum using the WIDER camera
+    _projScreenMatrix.multiplyMatrices(_wideCamera.projectionMatrix, _wideCamera.matrixWorldInverse);
     _cullFrustum.setFromProjectionMatrix(_projScreenMatrix);
 
     // 3. Setup Backface Culling helper
