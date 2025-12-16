@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { BufferGeometryUtils } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import nipplejs from 'nipplejs';
 
 // --- Global State ---
@@ -425,10 +425,6 @@ function animate() {
 // Fix stats timing
 lastTime = performance.now();
 
-init();
-animate();
-
-// Call init and animate only after all constants and functions are defined
 init();
 animate();
 
